@@ -1,0 +1,75 @@
+@import './styles/elegant-theme.css';
+
+/* Full viewport layout reset */
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-canvas);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive navigation and grid adjustments */
+@media (max-width: 900px) {
+  .desktop-nav {
+    display: none !important;
+  }
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+  .packages-grid-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .booking-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .cart-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .steps-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .gallery-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+  .name-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .search-bar-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .booking-card-grid {
+    grid-template-columns: 1fr !important;
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .steps-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Print Styles for Booking Boarding Pass */
+@media print {
+  header, footer, .lab-ribbon, button, .btn {
+    display: none !important;
+  }
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  .luxury-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
