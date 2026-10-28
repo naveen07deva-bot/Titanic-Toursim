@@ -9,14 +9,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [sessionStartTime, setSessionStartTime] = useState(() => {
+    return authApi.getToken() ? new Date().toLocaleTimeString() : null;
+  });
+  const [savedAccounts, setSavedAccounts] = useState(() => authApi.getSavedAccounts());
+
+  const refreshSavedAccounts = () => {
+    setSavedAccounts(authApi.getSavedAccounts());
+  };
+
   // Experiment 4a & 4b: Traveler login using authentication API and token storage
   const login = async (email, password, remember = true) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await authApi.login(email, password);
+      const result = await authApi.login(email, password, remember);
       setUser(result.user);
       setToken(result.token);
+      setSessionStartTime(new Date().toLocaleTimeString());
+      refreshSavedAccounts();
       setLoading(false);
       return { success: true, user: result.user, token: result.token };
     } catch (err) {
@@ -27,11 +38,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Register brand-new user and store their login information
+  const register = async (userData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await authApi.register(userData);
+      setUser(result.user);
+      setToken(result.token);
+      setSessionStartTime(new Date().toLocaleTimeString());
+      refreshSavedAccounts();
+      setLoading(false);
+      return { success: true, user: result.user, token: result.token };
+    } catch (err) {
+      setLoading(false);
+      const msg = err.response?.data?.message || err.message || 'Registration failed';
+      setError(msg);
+      throw new Error(msg);
+    }
+  };
+
   // Experiment 4f: Handle invalid and expired tokens in real time
   useEffect(() => {
     const handleAuthExpired = (event) => {
       setUser(null);
       setToken(null);
+      setSessionStartTime(null);
       setError(event.detail?.message || 'Session expired. Please log in again.');
     };
 
@@ -48,7 +80,19 @@ export const AuthProvider = ({ children }) => {
     authApi.logout();
     setUser(null);
     setToken(null);
+    setSessionStartTime(null);
     setError(null);
+    refreshSavedAccounts();
+  };
+
+  const sessionInfo = {
+    isAuthenticated: !!token && !!user,
+    sessionStatus: token && user ? 'Active (Authenticated)' : 'Guest (Unauthenticated)',
+    sessionStartTime: sessionStartTime || (token ? 'Earlier Today' : 'Not started'),
+    token: token,
+    user: user,
+    membershipTier: user?.membershipTier || 'First Class Royal Voyager',
+    savedAccountsCount: savedAccounts.length
   };
 
   const value = {
@@ -58,7 +102,11 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     login,
-    logout
+    register,
+    logout,
+    sessionInfo,
+    savedAccounts,
+    refreshSavedAccounts
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

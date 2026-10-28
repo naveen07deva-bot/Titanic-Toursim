@@ -26,7 +26,6 @@ import { PaymentStep } from './pages/booking-steps/PaymentStep';
 
 // Lab Guide Modal
 import { ExperimentGuideModal } from './components/lab/ExperimentGuideModal';
-import { ActionConsoleWidget } from './components/common/ActionConsoleWidget';
 
 export function App() {
   const [labGuideOpen, setLabGuideOpen] = useState(false);
@@ -125,9 +124,6 @@ export function App() {
                 isOpen={labGuideOpen}
                 onClose={() => setLabGuideOpen(false)}
               />
-
-              {/* Floating Live Action & JWT Console Widget */}
-              <ActionConsoleWidget />
             </div>
           </BrowserRouter>
         </BookingProvider>

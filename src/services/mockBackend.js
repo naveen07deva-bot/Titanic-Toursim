@@ -28,6 +28,40 @@ const setDb = (key, value) => {
 
 const DB_PACKAGES_KEY = 'titanic_db_packages';
 const DB_BOOKINGS_KEY = 'titanic_db_bookings';
+const DB_USERS_KEY = 'titanic_db_users';
+
+export const seedUsers = [
+  {
+    id: 'USR-1912',
+    name: 'Lord Arthur Peake-Sterling',
+    title: 'Lord',
+    firstName: 'Arthur',
+    lastName: 'Peake-Sterling',
+    email: 'lord.sterling@titanic.com',
+    password: 'RoyalVoyager1912!',
+    phone: '+44 20 7946 0912',
+    passportNumber: 'GBR891024B',
+    membershipTier: 'First Class Royal Voyager',
+    emergencyContact: 'Lady Eleanor Sterling (+44 7911 654321)',
+    specialRequests: 'Upper Promenade Verandah table for evening dinners; vintage champagne upon arrival in stateroom.',
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString()
+  },
+  {
+    id: 'USR-1913',
+    name: 'Lady Eleanor Sterling',
+    title: 'Lady',
+    firstName: 'Eleanor',
+    lastName: 'Sterling',
+    email: 'lady.eleanor@titanic.com',
+    password: 'RoyalVoyager1912!',
+    phone: '+44 20 7946 0913',
+    passportNumber: 'GBR891025C',
+    membershipTier: 'Imperial Suite Voyager',
+    emergencyContact: 'Lord Arthur Sterling (+44 7911 123456)',
+    specialRequests: 'Afternoon high tea service in suite daily.',
+    createdAt: new Date(Date.now() - 86400000 * 20).toISOString()
+  }
+];
 
 const seedBookings = [
   {
@@ -70,9 +104,13 @@ if (typeof localStorage !== 'undefined') {
   if (!localStorage.getItem(DB_BOOKINGS_KEY)) {
     setDb(DB_BOOKINGS_KEY, seedBookings);
   }
+  if (!localStorage.getItem(DB_USERS_KEY)) {
+    setDb(DB_USERS_KEY, seedUsers);
+  }
 } else {
   setDb(DB_PACKAGES_KEY, PACKAGES_DATA);
   setDb(DB_BOOKINGS_KEY, seedBookings);
+  setDb(DB_USERS_KEY, seedUsers);
 }
 
 /**
@@ -146,7 +184,97 @@ export const mockRestApiAdapter = async (config) => {
     }
   };
 
-  // 1. POST /auth/login
+  // 1a. GET /auth/users - Retrieve registered users for switching / auto-fill
+  if (method === 'get' && url.includes('/auth/users')) {
+    const users = getDb(DB_USERS_KEY, seedUsers);
+    const safeUsers = users.map(({ password: _, ...rest }) => rest);
+    return {
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'application/json' },
+      config,
+      data: {
+        success: true,
+        users: safeUsers
+      }
+    };
+  }
+
+  // 1b. POST /auth/register - Register brand new traveler & store login information
+  if (method === 'post' && url.includes('/auth/register')) {
+    const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
+    const { email, password, name, phone, title, membershipTier, passportNumber, emergencyContact, specialRequests } = body || {};
+
+    if (!email || !password) {
+      const err = new Error('Email and password are required');
+      err.response = {
+        status: 400,
+        statusText: 'Bad Request',
+        data: { message: 'Email and password are required for registration' },
+        config
+      };
+      throw err;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const users = getDb(DB_USERS_KEY, seedUsers);
+    const existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (existing) {
+      const err = new Error('User already exists');
+      err.response = {
+        status: 409,
+        statusText: 'Conflict',
+        data: { message: 'An account with this email address is already registered. Please sign in.' },
+        config
+      };
+      throw err;
+    }
+
+    const nameParts = (name || '').trim().split(' ');
+    const firstName = nameParts[0] || 'Traveler';
+    const lastName = nameParts.slice(1).join(' ') || 'Member';
+
+    const newUser = {
+      id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
+      name: (name || `${title || 'Lord'} ${firstName} ${lastName}`).trim(),
+      title: title || 'Lord',
+      firstName,
+      lastName,
+      email: cleanEmail,
+      password,
+      phone: phone || '+44 20 7946 0912',
+      passportNumber: passportNumber || ('GBR' + Math.floor(100000 + Math.random() * 900000) + 'X'),
+      membershipTier: membershipTier || 'First Class Royal Voyager',
+      emergencyContact: emergencyContact || '',
+      specialRequests: specialRequests || '',
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    setDb(DB_USERS_KEY, users);
+
+    // Generate JWT simulation token
+    const tokenPayload = btoa(JSON.stringify({ email: cleanEmail, iat: Date.now() }));
+    const jwtToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${tokenPayload}.titanic_secret_sig`;
+
+    const { password: _, ...safeUser } = newUser;
+
+    return {
+      status: 201,
+      statusText: 'Created',
+      headers: { 'content-type': 'application/json' },
+      config,
+      data: {
+        success: true,
+        message: 'Traveler registration successful. Session active.',
+        token: jwtToken,
+        user: safeUser
+      }
+    };
+  }
+
+  // 1c. POST /auth/login - Authenticate or automatically store new user & establish session
   if (method === 'post' && url.includes('/auth/login')) {
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
     const { email, password } = body || {};
@@ -162,18 +290,50 @@ export const mockRestApiAdapter = async (config) => {
       throw err;
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const users = getDb(DB_USERS_KEY, seedUsers);
+    let matchedUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (matchedUser) {
+      // If user exists, check credentials
+      if (matchedUser.password && matchedUser.password !== password) {
+        const err = new Error('Request failed with status code 401');
+        err.response = {
+          status: 401,
+          statusText: 'Unauthorized',
+          data: { message: 'Invalid password. Please check your credentials.' },
+          config
+        };
+        throw err;
+      }
+    } else {
+      // Store the login information of new user and use it!
+      const namePart = cleanEmail.split('@')[0];
+      const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+      matchedUser = {
+        id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
+        name: formattedName,
+        title: 'Lord',
+        firstName: formattedName,
+        lastName: 'Voyager',
+        email: cleanEmail,
+        password,
+        phone: '+44 20 7946 0912',
+        passportNumber: 'GBR' + Math.floor(100000 + Math.random() * 900000) + 'X',
+        membershipTier: 'First Class Royal Voyager',
+        emergencyContact: '',
+        specialRequests: '',
+        createdAt: new Date().toISOString()
+      };
+      users.push(matchedUser);
+      setDb(DB_USERS_KEY, users);
+    }
+
     // Generate JWT simulation token
-    const tokenPayload = btoa(JSON.stringify({ email, iat: Date.now() }));
+    const tokenPayload = btoa(JSON.stringify({ email: cleanEmail, iat: Date.now() }));
     const jwtToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${tokenPayload}.titanic_secret_sig`;
 
-    const namePart = email.split('@')[0];
-    const user = {
-      id: 'USR-' + Math.floor(1000 + Math.random() * 9000),
-      email,
-      name: namePart.charAt(0).toUpperCase() + namePart.slice(1),
-      membershipTier: 'First Class Royal Voyager',
-      phone: '+44 20 7946 0912'
-    };
+    const { password: _, ...safeUser } = matchedUser;
 
     return {
       status: 200,
@@ -184,7 +344,7 @@ export const mockRestApiAdapter = async (config) => {
         success: true,
         message: 'Authentication successful',
         token: jwtToken,
-        user
+        user: safeUser
       }
     };
   }

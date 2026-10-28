@@ -229,28 +229,6 @@ export const ExperimentGuideModal = ({ isOpen, onClose }) => {
             {/* Test Interactive Controls */}
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      if (window.logAllActions) window.logAllActions();
-                      if (window.logCurrentJwt) window.logCurrentJwt();
-                      alert('All recorded actions and decoded JWT token have been logged to the Browser DevTools Console (F12 > Console tab).');
-                    }
-                  }}
-                  style={{
-                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid #0284c7',
-                    color: '#0369a1',
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  🖥️ Print All Actions & JWT to Console (F12)
-                </button>
 
                 <button
                   type="button"

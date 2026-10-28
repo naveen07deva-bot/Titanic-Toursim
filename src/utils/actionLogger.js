@@ -1,17 +1,19 @@
 /**
  * Action & JWT Console Logger for TITANIC TOURISM
  * 
- * Provides rich, color-coded, professional console logging for:
- * 1. JWT Authentication Lifecycle (Login, Token Storage, Header/Payload Decoding, Expiration, Logout)
- * 2. Zustand Store Actions (Select Package, Add to Cart, Update Dates/Travelers, CRUD)
- * 3. Redux Toolkit Dispatches (Actions, Payloads, State Diffs, Middleware Timing)
- * 4. REST API CRUD Operations (Axios Requests, JWT Bearer Headers, Responses, 401 Expirations)
- * 5. Interactive DevTools Console Helpers (window.__TITANIC_JWT__, window.__TITANIC_ACTIONS__)
+ * Provides visible, real-time console logging using browser default font:
+ * 1. Webpage User Interactions (Button clicks, navigation, inputs, form submits)
+ * 2. JWT Authentication & Sessions (Tokens, decoded claims, traveler identity, localStorage sync)
+ * 3. Store Actions (Zustand booking state mutations, package selection, cart operations)
+ * 4. Redux Actions (Dispatched actions, payloads, state snapshots)
+ * 5. REST API Requests & Responses (Axios HTTP calls, Bearer token headers, responses)
  */
 
 // Storage keys
 export const TOKEN_STORAGE_KEY = 'titanic_auth_token';
 export const USER_STORAGE_KEY = 'titanic_auth_user';
+export const USER_LOGINS_KEY = 'titanic_user_logins';
+export const SAVED_ACCOUNTS_KEY = 'titanic_saved_logins';
 
 // In-memory action telemetry log buffer
 export const globalActionLogs = [];
@@ -103,7 +105,29 @@ function recordActionLog(entry) {
 }
 
 /**
- * Logs JWT Authentication Events (Login, Logout, Token Attachment, Expiration)
+ * Logs Webpage Actions visibly in the console using default font
+ */
+export function logWebpageAction(actionType, description, details = null) {
+  const timestamp = new Date().toLocaleTimeString();
+
+  if (typeof console !== 'undefined') {
+    if (details) {
+      console.log(`[WEBPAGE ACTION: ${actionType}] (${timestamp}) ${description}`, details);
+    } else {
+      console.log(`[WEBPAGE ACTION: ${actionType}] (${timestamp}) ${description}`);
+    }
+  }
+
+  return recordActionLog({
+    category: 'WEBPAGE_ACTION',
+    name: `${actionType}: ${description}`,
+    timestamp,
+    details
+  });
+}
+
+/**
+ * Logs JWT Authentication & Session Events visibly in console using default font
  */
 export function logJwtAuth(eventType, data = {}) {
   const token = data.token || (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null);
@@ -112,43 +136,31 @@ export function logJwtAuth(eventType, data = {}) {
   const timestamp = new Date().toLocaleTimeString();
 
   if (typeof console !== 'undefined') {
-    const isBrowser = typeof window !== 'undefined';
-    if (isBrowser) {
-      const badgeStyle = 'background: #0d9488; color: #ffffff; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 11px;';
-      const eventStyle = 'color: #0d9488; font-weight: bold; font-size: 11px;';
-      const timeStyle = 'color: #64748b; font-size: 10px;';
+    console.log(`==================== [JWT & SESSION: ${eventType}] (${timestamp}) ====================`);
+    console.log('Session Status:', token ? 'AUTHENTICATED' : 'GUEST (Unauthenticated)');
+    console.log('Active Traveler:', user ? `${user.name || user.email} (${user.email}) | Tier: ${user.membershipTier || 'First Class'}` : 'Guest User');
 
-      console.groupCollapsed(`%c[JWT AUTH]%c ${eventType} %c(${timestamp})`, badgeStyle, eventStyle, timeStyle);
-      console.log('%cEvent Type:%c ' + eventType, 'font-weight: bold; color: #0d9488;', '');
-      console.log('%cTimestamp:%c ' + timestamp, 'color: #64748b;', '');
-
-      if (token) {
-        console.log('%cRaw JWT Token (Bearer):%c\n' + token, 'color: #d97706; font-weight: bold;', 'color: #2563eb; word-break: break-all;');
-        console.log('%cDecoded JWT Header:%c', 'color: #d97706; font-weight: bold;', '', decoded?.header);
-        console.log('%cDecoded JWT Payload (Claims):%c', 'color: #d97706; font-weight: bold;', '', decoded?.payload);
-        if (decoded?.expiresAt) {
-          console.log('%cToken Expiration:%c ' + decoded.expiresAt + (decoded.isExpired ? ' (EXPIRED)' : ' (VALID)'), 'color: #d97706;', '');
-        }
-      } else {
-        console.log('%cToken Status:%c No active token (Purged / Unauthenticated)', 'color: #ef4444; font-weight: bold;', '');
+    if (token) {
+      console.log('Raw JWT Token (Bearer):\n' + token);
+      console.log('Decoded JWT Header:', decoded?.header);
+      console.log('Decoded JWT Payload (Claims):', decoded?.payload);
+      if (decoded?.expiresAt) {
+        console.log('Token Expiration:', decoded.expiresAt + (decoded.isExpired ? ' (EXPIRED)' : ' (VALID)'));
       }
-
-      if (user) {
-        console.log('%cAuthenticated Traveler Identity:%c', 'color: #16a34a; font-weight: bold;', '', user);
-      }
-
-      if (data.context) {
-        console.log('%cContext / Details:%c', 'color: #64748b;', '', data.context);
-      }
-
-      console.log('%cStorage Location:%c localStorage["' + TOKEN_STORAGE_KEY + '"]', 'color: #64748b; font-style: italic;', '');
-      console.groupEnd();
     } else {
-      console.log(`[JWT AUTH] ${eventType} at ${timestamp}`, {
-        tokenSnippet: token ? `${token.substring(0, 20)}...` : null,
-        user: user?.email || null
-      });
+      console.log('JWT Token: None (Guest Session)');
     }
+
+    if (data.context) {
+      console.log('Context / Note:', data.context);
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      const savedCount = JSON.parse(localStorage.getItem(USER_LOGINS_KEY) || '[]').length;
+      console.log(`Stored User Logins in localStorage["${USER_LOGINS_KEY}"]: ${savedCount} account(s)`);
+    }
+
+    console.log('================================================================================');
   }
 
   return recordActionLog({
@@ -163,46 +175,22 @@ export function logJwtAuth(eventType, data = {}) {
 }
 
 /**
- * Logs Zustand Store Actions (Select Package, Add to Cart, Dates, Travelers, Bookings)
+ * Logs Zustand Store Actions visibly in console using default font
  */
 export function logStoreAction(actionName, details = {}) {
   const timestamp = new Date().toLocaleTimeString();
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
-  const decoded = token ? decodeJwt(token) : null;
   const duration = details.durationMs || '0.00';
 
   if (typeof console !== 'undefined') {
-    const isBrowser = typeof window !== 'undefined';
-    if (isBrowser) {
-      const badgeStyle = 'background: #1e40af; color: #ffffff; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 11px;';
-      const actionStyle = 'color: #1e40af; font-weight: bold; font-size: 11px;';
-      const timeStyle = 'color: #64748b; font-size: 10px;';
-
-      console.groupCollapsed(`%c[STORE ACTION]%c ${actionName} %c(${duration}ms at ${timestamp})`, badgeStyle, actionStyle, timeStyle);
-      console.log('%cAction Name:%c ' + actionName, 'font-weight: bold; color: #1e40af;', '');
-
-      if (details.payload !== undefined) {
-        console.log('%cAction Payload / Input:%c', 'font-weight: bold;', '', details.payload);
-      }
-
-      if (details.prevStateSummary || details.nextStateSummary) {
-        console.log('%cState Transition:%c', 'font-weight: bold; color: #4b5563;', '', {
-          previousState: details.prevStateSummary,
-          nextState: details.nextStateSummary
-        });
-      }
-
-      // Link to active JWT status
-      const authStatus = token ? `Authenticated (Token Active)` : 'Guest (No Token)';
-      console.log('%cAssociated JWT Status:%c ' + authStatus, 'font-weight: bold; color: #0d9488;', '');
-      if (token) {
-        console.log('%cJWT Bearer Token:%c ' + token, 'color: #d97706;', 'color: #2563eb;');
-        console.log('%cJWT Claims (Payload):%c', 'color: #d97706;', '', decoded?.payload);
-      }
-
-      console.groupEnd();
-    } else {
-      console.log(`[STORE ACTION] ${actionName} (${duration}ms)`);
+    const summary = details.payload !== undefined ? details.payload : (details.nextStateSummary || '');
+    console.log(`[STORE ACTION] ${actionName} (${duration}ms at ${timestamp})`, summary);
+    if (details.prevStateSummary && details.nextStateSummary) {
+      console.log('  State Transition:', {
+        from: details.prevStateSummary,
+        to: details.nextStateSummary,
+        authSession: token ? 'Active JWT' : 'Guest'
+      });
     }
   }
 
@@ -217,30 +205,17 @@ export function logStoreAction(actionName, details = {}) {
 }
 
 /**
- * Logs Redux Toolkit Dispatched Actions (Experiment 2)
+ * Logs Redux Toolkit Dispatched Actions visibly in console using default font
  */
 export function logReduxAction(action, state, durationMs = '0.00') {
   const timestamp = new Date().toLocaleTimeString();
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
-  const decoded = token ? decodeJwt(token) : null;
 
   if (typeof console !== 'undefined') {
-    const isBrowser = typeof window !== 'undefined';
-    if (isBrowser) {
-      const badgeStyle = 'background: #7c3aed; color: #ffffff; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 11px;';
-      const actionStyle = 'color: #7c3aed; font-weight: bold; font-size: 11px;';
-      const timeStyle = 'color: #64748b; font-size: 10px;';
-
-      console.groupCollapsed(`%c[REDUX ACTION]%c ${action.type} %c(${durationMs}ms at ${timestamp})`, badgeStyle, actionStyle, timeStyle);
-      console.log('%cDispatched Redux Action:%c', 'font-weight: bold; color: #7c3aed;', '', action);
-      console.log('%cAction Payload:%c', 'font-weight: bold;', '', action.payload);
-      console.log('%cBooking Reducer State Snapshot:%c', 'font-weight: bold; color: #4b5563;', '', state);
-      console.log('%cActive JWT Session:%c ' + (token ? `Bearer ${token}` : 'No Active Token'), 'font-weight: bold; color: #0d9488;', '');
-      if (token) {
-        console.log('%cDecoded JWT Claims:%c', 'color: #d97706;', '', decoded?.payload);
-      }
-      console.groupEnd();
-    }
+    console.log(`[REDUX ACTION] ${action.type} (${durationMs}ms at ${timestamp})`, {
+      payload: action.payload,
+      session: token ? 'JWT Active' : 'Guest'
+    });
   }
 
   return recordActionLog({
@@ -254,7 +229,7 @@ export function logReduxAction(action, state, durationMs = '0.00') {
 }
 
 /**
- * Logs Outgoing REST API Requests (Experiment 1, 3, 4)
+ * Logs Outgoing REST API Requests visibly in console using default font
  */
 export function logApiRequest(config) {
   const timestamp = new Date().toLocaleTimeString();
@@ -266,31 +241,12 @@ export function logApiRequest(config) {
   const decoded = rawToken ? decodeJwt(rawToken) : null;
 
   if (typeof console !== 'undefined') {
-    const isBrowser = typeof window !== 'undefined';
-    if (isBrowser) {
-      const badgeStyle = 'background: #0284c7; color: #ffffff; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 11px;';
-      const reqStyle = 'color: #0284c7; font-weight: bold; font-size: 11px;';
-      const timeStyle = 'color: #64748b; font-size: 10px;';
-
-      console.groupCollapsed(`%c[REST API REQUEST]%c ${method} ${url} %c(${timestamp})`, badgeStyle, reqStyle, timeStyle);
-      console.log('%cMethod & URL:%c ' + method + ' ' + url, 'font-weight: bold;', '');
-      console.log('%cAuthorization Header (JWT):%c ' + (authHeader || 'None (Public Request)'), 'font-weight: bold; color: #0d9488;', '');
-
-      if (rawToken) {
-        console.log('%cAttached JWT Token:%c ' + rawToken, 'color: #d97706;', 'color: #2563eb;');
-        console.log('%cDecoded JWT Identity:%c', 'color: #d97706;', '', decoded?.payload);
-      }
-
-      if (config.params && Object.keys(config.params).length > 0) {
-        console.log('%cQuery Parameters (Filters):%c', 'font-weight: bold;', '', config.params);
-      }
-
-      if (config.data) {
-        const bodyData = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data;
-        console.log('%cRequest Body (Payload):%c', 'font-weight: bold;', '', bodyData);
-      }
-      console.groupEnd();
-    }
+    console.log(`[REST API REQUEST] ${method} ${url} (${timestamp})`, {
+      authorization: authHeader ? `Bearer ${rawToken ? rawToken.slice(0, 30) + '...' : ''}` : 'Public (None)',
+      claims: decoded?.payload || null,
+      params: config.params || null,
+      body: config.data ? (typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data) : null
+    });
   }
 
   return recordActionLog({
@@ -305,7 +261,7 @@ export function logApiRequest(config) {
 }
 
 /**
- * Logs Incoming REST API Responses
+ * Logs Incoming REST API Responses visibly in console using default font
  */
 export function logApiResponse(response) {
   const timestamp = new Date().toLocaleTimeString();
@@ -314,17 +270,7 @@ export function logApiResponse(response) {
   const method = (response.config?.method || 'GET').toUpperCase();
 
   if (typeof console !== 'undefined') {
-    const isBrowser = typeof window !== 'undefined';
-    if (isBrowser) {
-      const badgeStyle = 'background: #16a34a; color: #ffffff; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 11px;';
-      const resStyle = 'color: #16a34a; font-weight: bold; font-size: 11px;';
-      const timeStyle = 'color: #64748b; font-size: 10px;';
-
-      console.groupCollapsed(`%c[REST API RESPONSE]%c ${status} ${method} ${url} %c(${timestamp})`, badgeStyle, resStyle, timeStyle);
-      console.log('%cHTTP Status:%c ' + status + ' (' + response.statusText + ')', 'font-weight: bold; color: #16a34a;', '');
-      console.log('%cResponse Data Body:%c', 'font-weight: bold;', '', response.data);
-      console.groupEnd();
-    }
+    console.log(`[REST API RESPONSE] ${status} ${method} ${url} (${timestamp})`, response.data);
   }
 
   return recordActionLog({
@@ -337,7 +283,48 @@ export function logApiResponse(response) {
 }
 
 /**
- * Prints the master welcome console banner on startup
+ * Setup Global DOM Action Logger
+ * Listens for user clicks, button taps, inputs, and form submits across the webpage
+ * and logs every visible interaction directly to the browser console using default font.
+ */
+export function setupGlobalDomActionLogger() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  if (window.__TITANIC_DOM_LOGGER_INITIALIZED__) return;
+  window.__TITANIC_DOM_LOGGER_INITIALIZED__ = true;
+
+  // Click listener for buttons, links, and interactive elements
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('button, a, input[type="submit"], input[type="button"], [role="button"]');
+    if (!target) return;
+
+    const label = (
+      target.innerText ||
+      target.getAttribute('aria-label') ||
+      target.title ||
+      target.value ||
+      target.name ||
+      target.className ||
+      'Interactive Element'
+    ).trim().replace(/\s+/g, ' ');
+
+    const page = window.location.pathname;
+    logWebpageAction('CLICK', `User clicked "${label.slice(0, 50)}" on page ${page}`, {
+      tag: target.tagName,
+      page
+    });
+  }, true);
+
+  // Form submit listener
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    const formName = form.name || form.id || form.getAttribute('aria-label') || 'Form';
+    logWebpageAction('FORM_SUBMIT', `Submitted ${formName} on ${window.location.pathname}`);
+  }, true);
+}
+
+/**
+ * Prints the master welcome console banner on startup using default font
  */
 export function printConsoleWelcomeBanner() {
   if (typeof window === 'undefined' || typeof console === 'undefined') return;
@@ -345,37 +332,32 @@ export function printConsoleWelcomeBanner() {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
   const user = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || 'null');
   const decoded = token ? decodeJwt(token) : null;
+  const savedLogins = JSON.parse(localStorage.getItem(USER_LOGINS_KEY) || '[]');
 
-  console.log(
-    '%c 🚢 TITANIC TOURISM %c REAL-TIME ACTION & JWT CONSOLE MONITOR %c ACTIVE ',
-    'background: #162433; color: #dfc28b; padding: 6px 12px; font-family: serif; font-size: 14px; font-weight: bold; border-radius: 4px 0 0 4px; border: 1px solid #c5a059;',
-    'background: #0f1a24; color: #ffffff; padding: 6px 12px; font-size: 12px; font-weight: bold; border-top: 1px solid #c5a059; border-bottom: 1px solid #c5a059;',
-    'background: #0d9488; color: #ffffff; padding: 6px 12px; font-size: 12px; font-weight: bold; border-radius: 0 4px 4px 0; border: 1px solid #c5a059; border-left: none;'
-  );
-
-  console.log(
-    '%c[CONSOLE MONITOR] Every user action, store mutation, Redux dispatch, and JWT lifecycle event is logged below in real-time:\n' +
-    '  • 🔑 [JWT AUTH]      Login, token storage, claims decoding, expiration, logout\n' +
-    '  • ⚡ [STORE ACTION]  Zustand booking folio, package selection, dates, travelers, CRUD\n' +
-    '  • 📦 [REDUX ACTION]  Redux Toolkit dispatches, payload inspection, state snapshots\n' +
-    '  • 🌐 [REST API]      Axios HTTP requests (GET, POST, PUT, DELETE) with Bearer token headers\n\n' +
-    '💡 DevTools Console Commands Available:\n' +
-    '  ▶ window.__TITANIC_JWT__        — View active JWT Bearer token & decoded claims\n' +
-    '  ▶ window.__TITANIC_ACTIONS__    — View full chronological array of action logs\n' +
-    '  ▶ window.logCurrentJwt()        — Pretty-print current JWT in console\n' +
-    '  ▶ window.logAllActions()        — Display console.table of recent actions',
-    'color: #64748b; font-size: 11px; line-height: 1.6;'
-  );
-
+  console.log('========================================================================');
+  console.log('🚢 TITANIC TOURISM - ACTION & JWT CONSOLE MONITOR ACTIVE');
+  console.log('------------------------------------------------------------------------');
+  console.log('All webpage actions, clicks, booking mutations, REST API calls, and JWT');
+  console.log('session events are logged visibly below in real-time with default font.');
+  console.log('');
+  console.log('Current Session Status:', token ? '🟢 AUTHENTICATED' : '⚪ GUEST SESSION');
   if (token) {
-    console.groupCollapsed('%c[INITIAL STATE] Active JWT Bearer Session Detected', 'color: #0d9488; font-weight: bold;');
-    console.log('JWT Token:', token);
-    console.log('Decoded Payload:', decoded?.payload);
-    console.log('User Profile:', user);
-    console.groupEnd();
+    console.log('Active Traveler Profile:', user);
+    console.log('Active JWT Bearer Token:\n' + token);
+    console.log('Decoded JWT Header:', decoded?.header);
+    console.log('Decoded JWT Claims (Payload):', decoded?.payload);
+    console.log('Token Expiration:', decoded?.expiresAt || 'Active Session');
   } else {
-    console.log('%c[INITIAL STATE] Guest Session (No JWT in localStorage). Sign in or click "Auto Fill" on login to generate token.', 'color: #d97706; font-style: italic;');
+    console.log('No active JWT in localStorage. Browse as Guest or Sign in to authenticate.');
   }
+  console.log(`Stored User Logins in localStorage["${USER_LOGINS_KEY}"]: ${savedLogins.length} record(s)`);
+  console.log('------------------------------------------------------------------------');
+  console.log('DevTools Console Helpers:');
+  console.log('  * window.logCurrentJwt()     - Print current JWT token & claims');
+  console.log('  * window.logCurrentSession() - Print active session details & profile');
+  console.log('  * window.logSavedLogins()    - Print all user logins stored in localStorage');
+  console.log('  * window.logAllActions()     - Print table of all captured actions');
+  console.log('========================================================================');
 }
 
 // Global browser window setup
@@ -383,18 +365,43 @@ if (typeof window !== 'undefined') {
   window.logCurrentJwt = () => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) {
-      console.warn('[JWT] No token currently saved in localStorage.');
+      console.log('[JWT] No token currently saved in localStorage (Guest session).');
       return null;
     }
     const decoded = decodeJwt(token);
-    console.group('%c[JWT INSPECTION] Current Active Token', 'background: #0d9488; color: white; padding: 3px 8px; font-weight: bold;');
+    console.log('========== [ACTIVE JWT TOKEN & CLAIMS] ==========');
     console.log('Raw Token:\n' + token);
     console.log('Decoded Header:', decoded.header);
     console.log('Decoded Claims (Payload):', decoded.payload);
     console.log('Issued At:', decoded.issuedAt);
     console.log('Expires At:', decoded.expiresAt);
-    console.groupEnd();
+    console.log('=================================================');
     return decoded;
+  };
+
+  window.logCurrentSession = () => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const user = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || 'null');
+    const decoded = token ? decodeJwt(token) : null;
+    console.log('========== [ACTIVE TRAVELER SESSION] ==========');
+    console.log('Status:', token ? 'Authenticated' : 'Guest');
+    console.log('Traveler User:', user);
+    console.log('JWT Token:', token || 'None');
+    console.log('Claims:', decoded?.payload || null);
+    console.log('===============================================');
+    return { token, user, decoded };
+  };
+
+  window.logSavedLogins = () => {
+    const logins = JSON.parse(localStorage.getItem(USER_LOGINS_KEY) || '[]');
+    console.log(`========== [STORED USER LOGINS IN LOCALSTORAGE (${logins.length})] ==========`);
+    console.table(logins.map((l) => ({
+      Name: l.name,
+      Email: l.email,
+      Tier: l.membershipTier,
+      SavedAt: l.formattedTime || l.savedAt
+    })));
+    return logins;
   };
 
   window.logAllActions = () => {
@@ -402,8 +409,7 @@ if (typeof window !== 'undefined') {
       Time: l.timestamp,
       Category: l.category,
       Name: l.name,
-      Duration: l.durationMs || '-',
-      HasJWT: !!l.token
+      Duration: l.durationMs || '-'
     })));
     return globalActionLogs;
   };
@@ -412,3 +418,5 @@ if (typeof window !== 'undefined') {
   window.__TITANIC_ACTIONS__ = globalActionLogs;
   window.__TITANIC_JWT__ = initialToken ? decodeJwt(initialToken) : null;
 }
+
+

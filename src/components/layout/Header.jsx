@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Compass, ShoppingBag, User, LogOut, BookOpen, Menu, X, Shield, ChevronDown, Terminal } from 'lucide-react';
+import { Compass, ShoppingBag, User, LogOut, BookOpen, Menu, X, Shield, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { Button } from '../common/Button';
@@ -40,27 +40,20 @@ export const Header = ({ onOpenLabGuide }) => {
             <span className="lab-ribbon-badge">1912 HERITAGE FLEET</span>
             {isAuthenticated ? (
               <span
-                onClick={() => {
-                  if (typeof window !== 'undefined' && window.logCurrentJwt) {
-                    window.logCurrentJwt();
-                  }
-                }}
                 style={{
                   fontSize: '0.74rem',
                   backgroundColor: 'rgba(63, 110, 89, 0.35)',
                   border: '1px solid #3f6e59',
                   color: '#a3e2c3',
                   padding: '0.15rem 0.5rem',
-                  borderRadius: 'var(--radius-full)',
-                  cursor: 'pointer'
+                  borderRadius: 'var(--radius-full)'
                 }}
-                title="Click to print active JWT token & claims to browser console"
               >
-                🔒 JWT Bearer Active (Click to inspect)
+                🔒 JWT Session Active
               </span>
             ) : (
               <span style={{ fontSize: '0.74rem', backgroundColor: 'rgba(217, 119, 6, 0.25)', border: '1px solid #d97706', color: '#fcd34d', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)' }}>
-                🔑 Guest Session (Sign in for JWT)
+                🔑 Guest Session
               </span>
             )}
             <span style={{ fontSize: '0.78rem', color: '#c4d1df' }}>
@@ -69,30 +62,6 @@ export const Header = ({ onOpenLabGuide }) => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  if (window.logCurrentJwt) window.logCurrentJwt();
-                  if (window.logAllActions) window.logAllActions();
-                }
-              }}
-              style={{
-                background: 'rgba(56, 189, 248, 0.15)',
-                border: '1px solid #0284c7',
-                color: '#7dd3fc',
-                borderRadius: 'var(--radius-full)',
-                padding: '0.2rem 0.65rem',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}
-              title="Print all site actions and active JWT token to Browser DevTools Console (F12)"
-            >
-              <Terminal size={13} />
-              <span>Console: Actions & JWT</span>
-            </button>
 
             <button
               onClick={onOpenLabGuide}
